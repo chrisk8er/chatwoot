@@ -1,4 +1,4 @@
 # The below image is created out of the Dockerfile.base
 # It has the dependencies already installed so that codespace will boot up fast
-FROM ghcr.io/chrisk8er/chatwoot_codespace:latest
+FROM ghcr.io/chrisk8er/chatwoot_codespace:workspace-git
 
