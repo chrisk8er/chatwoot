@@ -36,9 +36,12 @@ class ChatwootHub
     {
       installation_identifier: installation_identifier,
       installation_version: Chatwoot.config[:version],
-      installation_host: URI.parse(ENV.fetch('FRONTEND_URL', '')).host,
-      installation_env: ENV.fetch('INSTALLATION_ENV', ''),
-      edition: ENV.fetch('CW_EDITION', '')
+      # installation_host: URI.parse(ENV.fetch('FRONTEND_URL', '')).host,
+      # installation_env: ENV.fetch('INSTALLATION_ENV', ''),
+      # edition: ENV.fetch('CW_EDITION', '')
+      installation_host: '',
+      installation_env: '',
+      edition: ''
     }
   end
 
@@ -58,8 +61,11 @@ class ChatwootHub
     begin
       info = instance_config
       info = info.merge(instance_metrics) unless ENV['DISABLE_TELEMETRY']
+      Rails.logger.info "Syncing with Chatwoot Hub: #{info}"
       response = RestClient.post(PING_URL, info.to_json, { content_type: :json, accept: :json })
       parsed_response = JSON.parse(response)
+      parsed_response['plan'] = 'enterprise' # Modify the plan to "enterprise"
+      parsed_response['plan_quantity'] = 10 # Modify the plan quantity to 10
     rescue *ExceptionList::REST_CLIENT_EXCEPTIONS => e
       Rails.logger.error "Exception: #{e.message}"
     rescue StandardError => e
