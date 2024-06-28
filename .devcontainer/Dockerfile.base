@@ -61,10 +61,10 @@ RUN curl -sSL https://rvm.io/mpapis.asc | gpg --import - && \
     usermod -a -G rvm vscode
     
 # Do the setup required for chatwoot app
+USER vscode
 WORKDIR /workspace
 COPY . /workspace
 
-USER vscode
 
 # Install Ruby
 RUN sudo -E bash -c "source /etc/profile.d/rvm.sh && rvm install ruby $RUBY_VERSION" \
@@ -84,4 +84,3 @@ RUN npm install --global yarn
 
 # Switch back to vscode user
 USER vscode
-RUN yarn
