@@ -2,6 +2,7 @@ ARG VARIANT
 
 FROM mcr.microsoft.com/vscode/devcontainers/base:0-${VARIANT}
 
+ARG USERNAME=vscode
 ARG NODE_VERSION
 ARG RUBY_VERSION
 ARG USER_UID
@@ -9,13 +10,15 @@ ARG USER_GID
 
 # Update args in docker-compose.yaml to set the UID/GID of the "vscode" user.
 RUN if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
-        groupmod --gid $USER_GID vscode \
-        && usermod --uid $USER_UID --gid $USER_GID vscode \
-        && chmod -R $USER_UID:$USER_GID /home/vscode; \
+        groupmod --gid $USER_GID $USERNAME \
+        && usermod --uid $USER_UID --gid $USER_GID $USERNAME \
+        && chown -R $USER_UID:$USER_GID /home/$USERNAME; \
     fi
 
 # Grant vscode user passwordless sudo access
-RUN echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode
+RUN apt-get install -y sudo \
+    && echo $USERNAME ALL=\(ALL\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 && apt-get -y install --no-install-recommends \
@@ -34,8 +37,8 @@ tmux \
 zsh \
 git-flow \
 npm \
-libyaml-dev
-
+libyaml-dev \
+curl
 
 # Install overmind
 RUN curl -L https://github.com/DarthSim/overmind/releases/download/v2.1.0/overmind-v2.1.0-linux-amd64.gz > overmind.gz \
@@ -49,36 +52,36 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | s
    && sudo apt update \
    && sudo apt install gh
 
-# Install rvm
-RUN apt-get -y install software-properties-common
-RUN apt-add-repository -y ppa:rael-gc/rvm
-RUN apt-get update && apt-get -y install rvm
-
+# Install Ruby using RVM (Ruby Version Manager)
+RUN curl -sSL https://rvm.io/mpapis.asc | gpg --import - && \
+    curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - && \
+    curl -sSL https://get.rvm.io | bash -s stable && \
+    echo 'source /etc/profile.d/rvm.sh' >> /etc/bash.bashrc && \
+    echo 'source "/etc/profile.d/rvm.sh"' >> ~/.zshrc && \
+    usermod -a -G rvm vscode
     
-# Do the set up required for chatwoot app
-USER vscode
-
+# Do the setup required for chatwoot app
 WORKDIR /workspace
 COPY . /workspace
 
+USER vscode
 
-# set path rvm to zsh
-RUN exec su -l vscode
-RUN usermod -a -G rvm vscode
-RUN echo 'source "/etc/profile.d/rvm.sh"' >> ~/.bashrc
-RUN echo 'source "/etc/profile.d/rvm.sh"' >> ~/.zshrc
+# Install Ruby
+RUN sudo -E bash -c "source /etc/profile.d/rvm.sh && rvm install ruby $RUBY_VERSION" \
+    && sudo -E bash -c "source /etc/profile.d/rvm.sh && rvm use $RUBY_VERSION --default" \
+    && sudo -E bash -c "source /etc/profile.d/rvm.sh && rvm list default"
 
-# Install ruby
-RUN RUN sudo -E bash -c 'source /etc/profile.d/rvm.sh && rvm install ruby $RUBY_VERSION' \
-    && sudo -E bash -c 'source /etc/profile.d/rvm.sh && rvm use $RUBY_VERSION' \ 
-    && sudo -E bash -c 'source /etc/profile.d/rvm.sh && rvm list default'
-
-# set up ruby
+# Set up Ruby
 COPY Gemfile Gemfile.lock ./
-RUN sudo gem install bundler && bundle install
+RUN bash -c "source /etc/profile.d/rvm.sh && gem install bundler"
+RUN bash -c "source /etc/profile.d/rvm.sh && bundle install"
 
-# set up node js
-RUN npm install n -g && \
-    n $NODE_VERSION
+# Set up Node.js and yarn as root
+USER root
+RUN npm install n -g
+RUN n $NODE_VERSION
 RUN npm install --global yarn
+
+# Switch back to vscode user
+USER vscode
 RUN yarn
